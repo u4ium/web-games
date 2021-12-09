@@ -6,9 +6,13 @@
 
 - Rust
 - Deps
+
   ```bash
   rustup target add wasm32-unknown-unknown
   cargo install trunk wasm-bindgen-cli cargo-watch
+
+  ???
+  cargo install diesel_cli --no-default-features --features "sqlite-bundled"
   ```
 
 ### Run and recompile on save

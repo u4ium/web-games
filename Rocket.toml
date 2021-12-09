@@ -1,0 +1,2 @@
+[default.databases.sea_orm]
+url = "sqlite:database/database.sqlite"

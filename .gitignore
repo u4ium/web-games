@@ -1,3 +1,4 @@
+/database
 /target
 app/dist
 Cargo.lock
