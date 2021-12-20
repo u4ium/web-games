@@ -1,4 +1,6 @@
-mod core;
+pub mod core;
+
+pub extern crate chess;
 
 #[cfg(test)]
 mod tests {

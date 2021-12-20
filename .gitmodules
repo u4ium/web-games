@@ -1,0 +1,3 @@
+[submodule "engines/chess"]
+	path = engines/chess
+	url = git@github.com:u4ium/chess

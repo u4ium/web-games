@@ -2,6 +2,7 @@
 
 members = [
     "engines",
+    "engines/chess",
     "server",
     "app",
 ]

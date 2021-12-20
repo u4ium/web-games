@@ -3,5 +3,50 @@
   <head>
     <meta charset="utf-8" />
     <title>Web Games</title>
+    <!-- <link rel="stylesheet" href="/index.css" /> -->
+
+    <style>
+      .app {
+        text-align: center;
+      }
+
+      .chess-board {
+        margin: auto;
+        border-collapse: collapse;
+      }
+
+      .chess-board td {
+        background-color: wheat;
+        height: 60px;
+        width: 60px;
+        font-size: 40px;
+        padding: 0px;
+      }
+
+      .chess-board tr:nth-of-type(odd) td:nth-of-type(even),
+      tr:nth-of-type(even) td:nth-of-type(odd) {
+        background-color: darkgoldenrod;
+      }
+
+      .selectable:hover,
+      .selected {
+        background-color: violet !important;
+      }
+
+      .rank-label,
+      .file-label {
+        background-color: wheat;
+      }
+
+      .rank-label {
+        border-left: 10px solid wheat;
+        border-right: 10px solid wheat;
+      }
+
+      .file-label {
+        border-top: 3px solid wheat;
+        border-bottom: 3px solid wheat;
+      }
+    </style>
   </head>
 </html>

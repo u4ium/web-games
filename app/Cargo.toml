@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 yew = "0.18"
+boolinator = "^2.4.0"
+engines = { path="../engines" }

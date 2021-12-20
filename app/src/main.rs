@@ -1,7 +1,12 @@
+extern crate engines;
+
 use yew::prelude::*;
 
 mod login;
 use login::LoginForm;
+
+mod chess;
+use chess::ChessBoard;
 
 pub enum AppMessage {
     Login(String),
@@ -39,7 +44,7 @@ impl Component for App {
         let login = self.link.callback(|username: String| Login(username));
         let logout = self.link.callback(|_| Logout);
         html! {
-            <main>
+            <main class="app">
                 <h1>{ "Web Games" }</h1>
                 {match &self.user {
                     Some(username) => html! {
@@ -47,6 +52,7 @@ impl Component for App {
                             <p>
                                 {format!("Welcome to web games, {}!", username)}
                             </p>
+                            <ChessBoard />
                             <button onclick=logout>{"Logout"}</button>
                         </div>
                     },
