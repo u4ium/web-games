@@ -53,7 +53,7 @@ impl Component for App {
                                 {format!("Welcome to web games, {}!", username)}
                             </p>
 
-                            <ChessBoard players={vec![White, Black]} show_moves={true}/>
+                            <ChessBoard players={vec![White, Black]} show_moves={true} ai={2}/>
 
                             <br />
                             <hr />

@@ -3,10 +3,14 @@ use std::collections::HashSet;
 use boolinator::Boolinator;
 use yew::{classes, prelude::*};
 
-use engines::chess::board::{
-    coordinates::{Coordinate, Move},
-    piece::Colour,
-    BoardState,
+use engines::chess::{
+    ai::AiPlayer,
+    board::{
+        coordinates::{Coordinate, Move},
+        piece::Colour,
+        BoardState,
+    },
+    Player,
 };
 
 pub use Colour::*;
@@ -18,6 +22,7 @@ pub struct ChessBoard {
     state: BoardState,
     selected: Option<Coordinate>,
     destinations: HashSet<Coordinate>,
+    ai: Option<AiPlayer>,
 }
 
 #[derive(Debug, Clone, Properties)]
@@ -27,6 +32,8 @@ pub struct ChessBoardProps {
     pub touch_move: bool,
     #[prop_or_default]
     pub show_moves: bool,
+    #[prop_or_default]
+    pub ai: u8,
 }
 
 pub enum ChessBoardMessage {
@@ -41,11 +48,17 @@ impl Component for ChessBoard {
     type Properties = ChessBoardProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let ai = if props.ai > 0 {
+            Some(AiPlayer::new(props.ai))
+        } else {
+            None
+        };
         Self {
             link,
             props,
+            ai,
             state: Default::default(),
-            selected: None,
+            selected: Default::default(),
             destinations: Default::default(),
         }
     }
@@ -69,6 +82,11 @@ impl Component for ChessBoard {
                         self.selected = None;
                         self.destinations.clear();
                         // TODO: await next move?
+                        // self.await_move();
+                        if let Some(ai) = &mut self.ai {
+                            let ai_move = ai.get_move(&mut self.state);
+                            self.state.try_move(ai_move.unwrap()).unwrap();
+                        }
                     } else {
                         // TODO display error
                         return false;
@@ -172,5 +190,12 @@ impl ChessBoard {
             .iter()
             .find(|&&p| p == current_player)
             .is_some()
+    }
+
+    async fn await_move(&mut self) {
+        if let Some(ai) = &mut self.ai {
+            let ai_move = ai.get_move(&mut self.state);
+            self.state.try_move(ai_move.unwrap()).unwrap();
+        }
     }
 }
