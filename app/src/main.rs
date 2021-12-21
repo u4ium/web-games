@@ -6,7 +6,7 @@ mod login;
 use login::LoginForm;
 
 mod chess;
-use chess::ChessBoard;
+use chess::{Black, ChessBoard, White};
 
 pub enum AppMessage {
     Login(String),
@@ -52,7 +52,13 @@ impl Component for App {
                             <p>
                                 {format!("Welcome to web games, {}!", username)}
                             </p>
-                            <ChessBoard />
+
+                            <ChessBoard players={vec![White, Black]} show_moves={true}/>
+
+                            <br />
+                            <hr />
+                            <br />
+
                             <button onclick=logout>{"Logout"}</button>
                         </div>
                     },

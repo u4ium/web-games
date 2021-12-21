@@ -1,51 +1,40 @@
+use std::collections::HashSet;
+
 use boolinator::Boolinator;
 use yew::{classes, prelude::*};
 
-use engines::chess;
+use engines::chess::board::{
+    coordinates::{Coordinate, Move},
+    piece::Colour,
+    BoardState,
+};
+
+pub use Colour::*;
 
 #[derive(Debug)]
 pub struct ChessBoard {
     link: ComponentLink<Self>,
     props: ChessBoardProps,
-    state: ChessBoardData,
-}
-
-#[derive(Debug)]
-struct ChessBoardData {
-    board: [[char; 8]; 8],
-}
-
-impl Default for ChessBoardData {
-    fn default() -> Self {
-        Self {
-            board: [
-                ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
-                ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
-                [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-                [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-                [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-                [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-                ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
-                ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖'],
-            ],
-        }
-    }
+    state: BoardState,
+    selected: Option<Coordinate>,
+    destinations: HashSet<Coordinate>,
 }
 
 #[derive(Debug, Clone, Properties)]
 pub struct ChessBoardProps {
-    // pub login: Callback<String>,
+    pub players: Vec<Colour>,
+    #[prop_or_default]
+    pub touch_move: bool,
+    #[prop_or_default]
+    pub show_moves: bool,
 }
 
 pub enum ChessBoardMessage {
-    Click {
-        column_index: usize,
-        row_index: usize,
-    },
+    Click(Coordinate),
 }
 use ChessBoardMessage::*;
 
-const FILES: [char; 8] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const FILES: [char; 8] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; // TODO: get from engine
 
 impl Component for ChessBoard {
     type Message = ChessBoardMessage;
@@ -56,16 +45,49 @@ impl Component for ChessBoard {
             link,
             props,
             state: Default::default(),
+            selected: None,
+            destinations: Default::default(),
         }
     }
 
     fn update(&mut self, message: Self::Message) -> bool {
         match message {
-            Click {
-                column_index,
-                row_index,
-            } => {
-                // TODO
+            Click(clicked) => {
+                let current_player = self.state.get_next_player();
+                if !self.is_playable(current_player) {
+                    // TODO: display error
+                    return false;
+                }
+                if let Some(selected) = self.selected {
+                    if !self.props.touch_move && selected == clicked {
+                        self.selected = None;
+                        self.destinations.clear();
+                    } else if let Ok(_) = self.state.try_move(Move {
+                        from: selected,
+                        to: clicked,
+                    }) {
+                        self.selected = None;
+                        self.destinations.clear();
+                        // TODO: await next move?
+                    } else {
+                        // TODO display error
+                        return false;
+                    }
+                } else {
+                    self.destinations = self
+                        .state
+                        .get_legal_moves_from(clicked, current_player)
+                        .into_iter()
+                        .map(|m| m.to)
+                        .collect();
+
+                    if self.destinations.len() > 0 {
+                        self.selected = Some(clicked);
+                    } else {
+                        // TODO display error
+                        return false;
+                    }
+                }
             }
         }
         true
@@ -77,29 +99,50 @@ impl Component for ChessBoard {
     }
 
     fn view(&self) -> Html {
+        let current_player = self.state.get_next_player();
+        let is_playable = self.is_playable(current_player);
+
         html! {
             <table class="chess-board">
                 <tbody>
-                    {for self.state.board.iter().enumerate().map(|(row_index, row)| {
-                        let rank = 8 - row_index;
+                    {for self.state.board.iter().map(|(rank, row)| {
+                        let r = rank as u8; // TODO
                         html! {
-                            <tr key={row_index}>
+                            <tr key={r}>
                                 <th class="rank-label">
-                                    {rank}
+                                    {r}
                                 </th>
-                                {for row.iter().enumerate().map(|(column_index, square)| {
-                                    let selectable = square != &' ';
-                                    let on_click = self.link.callback(move |_e| Click{
-                                        column_index,
-                                        row_index,
-                                    });
+                                {for row.iter().map(|(file, square)| {
+                                    let f = file as u8;
+                                    let coordinate = Coordinate{
+                                        column: file,
+                                        row: rank,
+                                    };
+
+                                    let selected = match self.selected {
+                                        Some(c) if c  == coordinate => true,
+                                        _ => false
+                                    };
+                                    let selectable = is_playable && self.selected.is_none() && match square {
+                                        Some(piece) if piece.colour == current_player => true,
+                                        _ => false,
+                                    };
+                                    let can_move_to = self.props.show_moves && self.destinations.contains(&coordinate);
+                                    let classes = classes!{
+                                        selectable.as_some("selectable"),
+                                        selected.as_some("selected"),
+                                        can_move_to.as_some("can-move-to")
+                                    };
+
+                                    let on_click = self.link.callback(move |_e| Click(coordinate));
+
                                     html! {
                                         <td
-                                            key={column_index}
-                                            class=classes!{selectable.as_some("selectable")}
+                                            key={f}
+                                            class={classes}
                                             onclick={on_click}
                                         >
-                                            {square}
+                                            {square.and_then(|piece| Some(piece.to_string())).unwrap_or(String::new())}
                                         </td>
                                     }
                                 })}
@@ -119,5 +162,15 @@ impl Component for ChessBoard {
                 </tbody>
             </table>
         }
+    }
+}
+
+impl ChessBoard {
+    fn is_playable(&self, current_player: Colour) -> bool {
+        self.props
+            .players
+            .iter()
+            .find(|&&p| p == current_player)
+            .is_some()
     }
 }
