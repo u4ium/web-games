@@ -28,7 +28,7 @@
       }
 
       .chess-board tr:nth-of-type(odd) td:nth-of-type(even),
-      tr:nth-of-type(even) td:nth-of-type(odd) {
+      .chess-board tr:nth-of-type(even) td:nth-of-type(odd) {
         background-color: darkgoldenrod;
       }
 
@@ -38,7 +38,7 @@
       }
 
       .can-move-to {
-        filter: hue-rotate(35deg);
+        filter: hue-rotate(45deg);
       }
 
       .can-move-to:hover {
@@ -58,6 +58,14 @@
       .file-label {
         border-top: 3px solid wheat;
         border-bottom: 3px solid wheat;
+      }
+
+      .is-white-piece {
+        color: white;
+      }
+
+      .is-black-piece {
+        color: black;
       }
     </style>
   </head>

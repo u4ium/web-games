@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yew = "0.18"
+yew = "0.19.3"
 boolinator = "^2.4.0"
+web-sys = "^0.3"
+
 engines = { path="../engines" }

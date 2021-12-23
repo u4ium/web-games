@@ -16,7 +16,6 @@ use AppMessage::*;
 
 #[derive(Debug)]
 pub struct App {
-    link: ComponentLink<Self>,
     user: Option<String>,
 }
 
@@ -24,11 +23,11 @@ impl Component for App {
     type Message = AppMessage;
     type Properties = ();
 
-    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link, user: None }
+    fn create(_ctx: &Context<Self>) -> Self {
+        Self { user: None }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Login(user_name) => self.user = Some(user_name),
             Logout => self.user = None,
@@ -36,13 +35,9 @@ impl Component for App {
         true
     }
 
-    fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-        false
-    }
-
-    fn view(&self) -> Html {
-        let login = self.link.callback(|username: String| Login(username));
-        let logout = self.link.callback(|_| Logout);
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let login = ctx.link().callback(|username: String| Login(username));
+        let logout = ctx.link().callback(|_| Logout);
         html! {
             <main class="app">
                 <h1>{ "Web Games" }</h1>
@@ -53,17 +48,21 @@ impl Component for App {
                                 {format!("Welcome to web games, {}!", username)}
                             </p>
 
-                            <ChessBoard players={vec![White, Black]} show_moves={true} ai={2}/>
+                            <ChessBoard
+                                players={vec![White, Black]}
+                                show_moves={true}
+                                // ai={1}
+                            />
 
                             <br />
                             <hr />
                             <br />
 
-                            <button onclick=logout>{"Logout"}</button>
+                            <button onclick={logout}>{"Logout"}</button>
                         </div>
                     },
                     None => html! {
-                        <LoginForm login=login />
+                        <LoginForm login={login} />
                     }
                 }}
             </main>

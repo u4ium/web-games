@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 
 use boolinator::Boolinator;
 use yew::{classes, prelude::*};
@@ -6,26 +9,44 @@ use yew::{classes, prelude::*};
 use engines::chess::{
     ai::AiPlayer,
     board::{
-        coordinates::{Coordinate, Move},
+        coordinates::{ColumnIndex, Coordinate, Move},
+        grid::Square,
         piece::Colour,
         BoardState,
     },
-    Player,
 };
+
+mod square;
+use square::ChessSquare;
 
 pub use Colour::*;
 
 #[derive(Debug)]
+pub enum InputState {
+    NoPieceSelected,
+    PieceSelected {
+        location: Coordinate,
+        destinations: HashSet<Coordinate>,
+    },
+}
+use InputState::*;
+
+#[derive(Debug)]
+pub enum ChessBoardState {
+    AwaitingInput(InputState),
+    // AwaitingOtherPlayers,
+    // ShowingError(&'static str),
+}
+use ChessBoardState::*;
+
+#[derive(Debug)]
 pub struct ChessBoard {
-    link: ComponentLink<Self>,
-    props: ChessBoardProps,
-    state: BoardState,
-    selected: Option<Coordinate>,
-    destinations: HashSet<Coordinate>,
-    ai: Option<AiPlayer>,
+    board_state: Arc<Mutex<BoardState>>,
+    ai: Option<Arc<Mutex<AiPlayer>>>,
+    state: ChessBoardState,
 }
 
-#[derive(Debug, Clone, Properties)]
+#[derive(Debug, Clone, PartialEq, Properties)]
 pub struct ChessBoardProps {
     pub players: Vec<Colour>,
     #[prop_or_default]
@@ -38,121 +59,122 @@ pub struct ChessBoardProps {
 
 pub enum ChessBoardMessage {
     Click(Coordinate),
+    // SetState(ChessBoardState),
 }
 use ChessBoardMessage::*;
-
-const FILES: [char; 8] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; // TODO: get from engine
 
 impl Component for ChessBoard {
     type Message = ChessBoardMessage;
     type Properties = ChessBoardProps;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let ai = if props.ai > 0 {
-            Some(AiPlayer::new(props.ai))
+    fn create(ctx: &Context<Self>) -> Self {
+        let ai_level = ctx.props().ai;
+        let ai = if ai_level > 0 {
+            Some(Arc::new(Mutex::new(AiPlayer::new(ai_level))))
         } else {
             None
         };
+
         Self {
-            link,
-            props,
             ai,
-            state: Default::default(),
-            selected: Default::default(),
-            destinations: Default::default(),
+            board_state: Arc::new(Mutex::new(Default::default())),
+            state: AwaitingInput(NoPieceSelected),
         }
     }
 
-    fn update(&mut self, message: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, message: Self::Message) -> bool {
         match message {
+            // SetState(new_state) => {
+            //     self.state = new_state;
+            // }
             Click(clicked) => {
-                let current_player = self.state.get_next_player();
-                if !self.is_playable(current_player) {
+                let current_player = self.board_state.lock().unwrap().get_next_player();
+                if !self.is_playable(ctx, current_player) {
                     // TODO: display error
                     return false;
                 }
-                if let Some(selected) = self.selected {
-                    if !self.props.touch_move && selected == clicked {
-                        self.selected = None;
-                        self.destinations.clear();
-                    } else if let Ok(_) = self.state.try_move(Move {
-                        from: selected,
-                        to: clicked,
-                    }) {
-                        self.selected = None;
-                        self.destinations.clear();
-                        // TODO: await next move?
-                        // self.await_move();
-                        if let Some(ai) = &mut self.ai {
-                            let ai_move = ai.get_move(&mut self.state);
-                            self.state.try_move(ai_move.unwrap()).unwrap();
-                        }
-                    } else {
-                        // TODO display error
-                        return false;
-                    }
-                } else {
-                    self.destinations = self
-                        .state
-                        .get_legal_moves_from(clicked, current_player)
-                        .into_iter()
-                        .map(|m| m.to)
-                        .collect();
+                match self.state {
+                    AwaitingInput(NoPieceSelected) => {
+                        let destinations: HashSet<_> = self
+                            .board_state
+                            .lock()
+                            .unwrap()
+                            .get_legal_moves_from(clicked, current_player)
+                            .into_iter()
+                            .map(|m| m.to)
+                            .collect();
 
-                    if self.destinations.len() > 0 {
-                        self.selected = Some(clicked);
-                    } else {
-                        // TODO display error
-                        return false;
+                        if destinations.len() > 0 {
+                            self.state = AwaitingInput(PieceSelected {
+                                location: clicked,
+                                destinations,
+                            })
+                        } else {
+                            // TODO display error
+                            return false;
+                        }
                     }
+                    AwaitingInput(PieceSelected { location, .. }) => {
+                        if !ctx.props().touch_move && location == clicked {
+                            self.state = AwaitingInput(NoPieceSelected);
+                        } else if let Ok(_) = self.board_state.lock().unwrap().try_move(Move {
+                            from: location,
+                            to: clicked,
+                        }) {
+                            // TODO
+                            self.state = AwaitingInput(NoPieceSelected);
+                            // if self.is_playable(ctx, self.board_state.lock().unwrap().get_next_player())
+                            // {
+                            //     let state = self.board_state.clone();
+                            //     let ai = self.ai.clone();
+                            //     ctx.link().send_future(async {
+                            //         if let Some(ai) = ai {
+                            //             if Self::ai_move(state, ai).await {
+                            //                 SetState(AwaitingInput)
+                            //             } else {
+                            //                 SetState(ShowingError(""))
+                            //             }
+                            //         } else {
+                            //             SetState(ShowingError("")) // TODO not if 2-player
+                            //         }
+                            //     });
+                            //     ctx.link().send_message(SetState(AwaitingOtherPlayers));
+                            // }
+                        } else {
+                            // TODO display error
+                            return false;
+                        }
+                    } //
+                      // _ => {
+                      //     return false;
+                      // }
                 }
             }
         }
         true
     }
 
-    fn change(&mut self, _new_props: Self::Properties) -> bool {
-        // TODO
-        false
-    }
-
-    fn view(&self) -> Html {
-        let current_player = self.state.get_next_player();
-        let is_playable = self.is_playable(current_player);
-
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let current_player = self.board_state.lock().unwrap().get_next_player();
         html! {
             <table class="chess-board">
                 <tbody>
-                    {for self.state.board.iter().map(|(rank, row)| {
+                    {for self.board_state.as_ref().lock().unwrap().board.iter().map(|(rank, row)| {
                         let r = rank as u8; // TODO
                         html! {
                             <tr key={r}>
-                                <th class="rank-label">
-                                    {r}
+                                <th scope="row" class="rank-label">
+                                    {rank}
                                 </th>
+
                                 {for row.iter().map(|(file, square)| {
                                     let f = file as u8;
                                     let coordinate = Coordinate{
                                         column: file,
                                         row: rank,
                                     };
-
-                                    let selected = match self.selected {
-                                        Some(c) if c  == coordinate => true,
-                                        _ => false
-                                    };
-                                    let selectable = is_playable && self.selected.is_none() && match square {
-                                        Some(piece) if piece.colour == current_player => true,
-                                        _ => false,
-                                    };
-                                    let can_move_to = self.props.show_moves && self.destinations.contains(&coordinate);
-                                    let classes = classes!{
-                                        selectable.as_some("selectable"),
-                                        selected.as_some("selected"),
-                                        can_move_to.as_some("can-move-to")
-                                    };
-
-                                    let on_click = self.link.callback(move |_e| Click(coordinate));
+                                    let classes = self.get_square_classes(coordinate, square, current_player);
+                                    let on_click = ctx.link().callback(move |_e| Click(coordinate));
 
                                     html! {
                                         <td
@@ -160,42 +182,89 @@ impl Component for ChessBoard {
                                             class={classes}
                                             onclick={on_click}
                                         >
-                                            {square.and_then(|piece| Some(piece.to_string())).unwrap_or(String::new())}
+                                            <ChessSquare square={square.clone()} />
                                         </td>
                                     }
                                 })}
                             </tr>
                         }
                     })}
+                </tbody>
+                <tfoot>
                     <tr class="file-labels">
                         <th class="rank-label file-label"></th>
-                        {for FILES.iter().enumerate().map(|(index, file)| {
+                        {for ColumnIndex::get_columns().iter().enumerate().map(|(index, file)| {
                             html!{
-                                <th key={index} class="file-label">
+                                <th scope="col" key={index} class="file-label">
                                     {file}
                                 </th>
                             }
                         })}
                     </tr>
-                </tbody>
+                </tfoot>
+                <caption>
+                    {match self.state {
+                        AwaitingInput(_) => "Choose your move...",
+                        // AwaitingOtherPlayers => "Wait for opponent",
+                        // ShowingError(e) => e,
+                    }}
+                </caption>
             </table>
         }
     }
 }
 
 impl ChessBoard {
-    fn is_playable(&self, current_player: Colour) -> bool {
-        self.props
+    fn get_square_classes(
+        &self,
+        coordinate: Coordinate,
+        square: &Square,
+        current_player: Colour,
+    ) -> Classes {
+        let [selected, selectable, can_move_to] = match self.state {
+            AwaitingInput(NoPieceSelected) => {
+                if let Some(piece) = square {
+                    [false, piece.colour == current_player, false]
+                } else {
+                    [false, false, false]
+                }
+            }
+            AwaitingInput(PieceSelected { location, .. }) if location == coordinate => {
+                [true, false, false]
+            }
+            AwaitingInput(PieceSelected {
+                ref destinations, ..
+            }) if destinations.contains(&coordinate) => [false, false, true],
+            _ => [false, false, false],
+        };
+
+        let [is_white_piece, is_black_piece] = match square {
+            None => [false, false],
+            Some(p) if p.colour == White => [true, false],
+            Some(p) if p.colour == Black => [false, true],
+            _ => unreachable!(),
+        };
+
+        classes! {
+            selectable.as_some("selectable"),
+            selected.as_some("selected"),
+            can_move_to.as_some("can-move-to"),
+            is_white_piece.as_some("is-white-piece"),
+            is_black_piece.as_some("is-black-piece"),
+        }
+    }
+
+    fn is_playable(&self, ctx: &Context<Self>, current_player: Colour) -> bool {
+        ctx.props()
             .players
             .iter()
             .find(|&&p| p == current_player)
             .is_some()
     }
 
-    async fn await_move(&mut self) {
-        if let Some(ai) = &mut self.ai {
-            let ai_move = ai.get_move(&mut self.state);
-            self.state.try_move(ai_move.unwrap()).unwrap();
-        }
-    }
+    // async fn ai_move(state: Arc<Mutex<BoardState>>, ai: Arc<Mutex<AiPlayer>>) -> bool {
+    //     let mut state = state.lock().unwrap();
+    //     let ai_move = ai.lock().unwrap().get_move(&mut state).unwrap();
+    //     state.try_move(ai_move).is_ok() // TODO: keep Result<(), Error>
+    // }
 }
